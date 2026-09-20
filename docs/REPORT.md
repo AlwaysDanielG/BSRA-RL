@@ -24,7 +24,7 @@ To display an image, add `!`: `![Model screenshot](../results/model.png)`.
 
   MuJoCo is the physics engine. It loads the model files and figures out how the cart and pole actually move when a force is applied to the cart. Gymnasium sits on top of that and turns the simulation into a normal RL task, so it decides what the agent sees, what actions it can take, what reward it gets, and when an episode ends. Stable-Baselines3 is what does the learning. It talks to the Gymnasium environment, runs episodes over and over, and trains a PPO policy for me so I don't have to write the algorithm myself. TensorBoard just shows the numbers that SB3 logs while training, like reward over time, so I can see if things are improving and compare different runs.
 
-  The way they fit together is pretty simple. SB3 picks an action, Gymnasium passes it into MuJoCo, MuJoCo steps the physics forward, and the new state comes back as an observation and a reward. That loop repeats thousands of times, and TensorBoard lets me look at what happened.
+  This is how they fit: SB3 picks an action, Gymnasium passes it into MuJoCo, MuJoCo steps the physics forward, and the new state comes back as an observation and a reward. That loop repeats thousands of times, and TensorBoard lets me look at what happened.
 
 ## Model and task
 
