@@ -77,13 +77,26 @@ setting that supports your answer, and distinguish MuJoCo's role from Gymnasium'
 
 | Topic        | Question                                                                                                                                                | Your answer |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| Observations | What are the four values returned to the policy, in order and with units? Where do those values come from, and how does `_get_obs()` assemble them?     | **TODO**    |
-| Actions      | What does the action control, what is its allowed range, and how does it reach the motor?                                                               | **TODO**    |
-| Physics      | Which tool computes motion from your XML model, and how does Gymnasium ask it to advance? How much simulated time passes per action?                    | **TODO**    |
-| Reset        | What does `reset_model()` change at the start of an episode? How are the starting values randomized, and what does using the same reset seed reproduce? | **TODO**    |
-| Reward       | What is the exact reward rule, which code computes it, and does it use the state before or after the action?                                            | **TODO**    |
+| Observations | What are the four values returned to the policy, in order and with units? Where do those values come from, and how does `_get_obs()` assemble them?     | Cart position (m), pole angle (rad), cart velocity (m/s), pole angular velocity (rad/s). They come straight from MuJoCo's simulation data: `_get_obs()` does `np.concatenate([self.data.qpos, self.data.qvel]).ravel()`, and my XML has two joints, so `qpos` and `qvel` are two elements each. The order follows the XML, `slider` first and `hinge` second. Gymnasium only copies the numbers out; MuJoCo is what computed them. |
+| Actions      | What does the action control, what is its allowed range, and how does it reach the motor?                                                               | One value, the force pushing the cart along the rail. The range is `[-3, 3]`, which Gymnasium reads off the `ctrlrange` I set on `cart_motor` in [assets/cartpole.xml](../assets/cartpole.xml), not from anything in the Python. It reaches the motor in `_step_mujoco_simulation()`, which does `self.data.ctrl[:] = ctrl`. The `gear="100"` on the motor then scales it, so an action of 3 is not 3 N at the joint. |
+| Physics      | Which tool computes motion from your XML model, and how does Gymnasium ask it to advance? How much simulated time passes per action?                    | MuJoCo computes the motion. `step()` calls `do_simulation(action, self.frame_skip)`, which passes it to `_step_mujoco_simulation()`, which calls `mujoco.mj_step(..., nstep=n_frames)`. That is the same `mj_step` the viewer used in Stage 2. With `timestep=0.02` from my scene and `FRAME_SKIP = 2`, each action covers `0.04 s` of simulated time (`dt = timestep * frame_skip`), so the policy acts at 25 Hz. |
+| Reset        | What does `reset_model()` change at the start of an episode? How are the starting values randomized, and what does using the same reset seed reproduce? | It resets all four state values. It takes `init_qpos` and `init_qvel`, which are the zero/upright state from my XML, adds uniform noise in `[-0.01, 0.01]` (`RESET_NOISE` passed in as `reset_noise_scale`), and calls `set_state()`. The noise comes from `self.np_random`, so the same reset seed gives the exact same starting state every time, which is what makes the PPO-versus-random comparison in Stage 5 fair. |
+| Reward       | What is the exact reward rule, which code computes it, and does it use the state before or after the action?                                            | `reward = int(not terminated)` in `step()`, so 1 for every step survived and 0 on the step that fails. It uses the state *after* the action: `step()` simulates first, then calls `_get_obs()`, then checks `terminated`. Failure is `abs(observation[1]) > 0.2` rad of pole angle, or a non-finite observation. Cart position never fails, and my XML's `[-1.25, 1.25]` slider limit only blocks the cart, it does not end the episode. |
 
-- Environment test and random-rollout results; action-range warning: **TODO**
+- Environment test and random-rollout results; action-range warning:
+
+  `uv run python -m pytest test/test_env.py` passes all 11 tests. Random rollouts
+  (`scripts/evaluate.py --random-only --run-name random-debug --episodes 3`) gave a
+  mean return of 4.67 and mean length 5.67 steps, with every episode ending on
+  `terminated` and none hitting the time limit, so random pushing drops the pole in
+  well under half a second. The `--video` run wrote
+  `videos/random-debug/episode-10000.mp4` at 640 x 480, 25 fps, and my custom cart,
+  pole, rail, and floor are visible through the `side` camera.
+
+  SB3's env checker warns: `UserWarning: We recommend you to use a symmetric and
+  normalized Box action space (range=[-1, 1])`. I am keeping `[-3, 3]` because the
+  onboarding says to, and because the range comes from the motor's `ctrlrange` in
+  my XML.
 
 ## Training
 

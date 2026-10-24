@@ -13,9 +13,14 @@ RESET_NOISE = 0.01
 
 def make_env(render_mode: str | None = None, max_episode_steps: int = MAX_EPISODE_STEPS) -> gym.Env:
     """Use the custom scene with Gymnasium's supplied balancing task."""
-    # MEMBER TODO 3: Return gym.make("InvertedPendulum-v5", ...).
-    # Pass in values for the xml_file, frame_skip, reset_noise_scale, max_episode_steps, render_mode, width, height, and camera_name arguments
-    # All of these values are provided through existing variables or function inputs
-    # Set width=640, height=480, and camera_name="side" for consistent videos.
-    # Gymnasium supplies the reward/reset rules and adds the TimeLimit wrapper.
-    raise NotImplementedError("Section 3: connect the custom scene to Gymnasium")
+    return gym.make(
+        "InvertedPendulum-v5",
+        xml_file=str(SCENE),
+        frame_skip=FRAME_SKIP,
+        reset_noise_scale=RESET_NOISE,
+        max_episode_steps=max_episode_steps,
+        render_mode=render_mode,
+        width=640,
+        height=480,
+        camera_name="side",
+    )
