@@ -32,10 +32,42 @@ To display an image, add `!`: `![Model screenshot](../results/model.png)`.
 
 - Which tool loads `scene.xml` and its included `cartpole.xml`, and what does it
   create from them? Point to the loading call in `scripts/view_model.py`. Which
-  tool computes the motion you see in the viewer when a control is applied? **TODO**
+  tool computes the motion you see in the viewer when a control is applied?
+
+  MuJoCo does both. `mujoco.MjModel.from_xml_path` in
+  [scripts/view_model.py](../scripts/view_model.py#L18) reads `scene.xml`, pulls
+  `cartpole.xml` in at the `<include>`, and compiles the two files into one
+  `MjModel`, which is the fixed description of the bodies, joints, geoms, and the
+  motor. The changing state lives in a separate `MjData`. MuJoCo also computes the
+  motion: the loop in [onboarding/viewer.py](../onboarding/viewer.py) writes the
+  control into `data.ctrl` and calls `mujoco.mj_step`, which advances the physics
+  by one `0.02 s` timestep, and the viewer just draws whatever that produced.
+
 - Which XML file owns the mechanism, and how does the include connect it to the
   scene? Explain the slide/hinge axes, unactuated pole, box half-extents, and
-  degrees versus radians. Link a small model screenshot (`../results/model.png`): **TODO**
+  degrees versus radians. Link a small model screenshot (`../results/model.png`):
+
+  [assets/cartpole.xml](../assets/cartpole.xml) owns the mechanism. It holds the
+  `cart` and `pole` bodies and the `cart_motor` actuator inside a
+  `<mujocoinclude>` root, so it is not a model on its own.
+  [assets/scene.xml](../assets/scene.xml) is the top-level `<mujoco>` model, and
+  its `<include file="cartpole.xml"/>` drops those contents in during compilation.
+  The scene keeps the global settings and the scenery: compiler units, gravity,
+  RK4, timestep, the floor, rail, light, and the `side` camera.
+
+  The `slider` joint slides along `1 0 0`, so the cart moves in x, down the rail.
+  The `hinge` rotates about `0 1 0`, so the pole falls in the x-z plane, the same
+  plane the cart moves in. Only `slider` has a motor; the pole has no actuator, so
+  it only moves from gravity and from being dragged by the cart. Box `size` values
+  are half-extents, which is why `0.15 0.10 0.08` gives the `0.30 x 0.20 x 0.16 m`
+  cart. The scene sets `angle="degree"`, so the hinge range is written as
+  `-90 90` in the XML, but at runtime MuJoCo reports that joint in radians, and
+  `qpos[1]` is limited to about `+/-1.5708`.
+
+  ![Model screenshot](../results/model.png)
+
+  The shot is the `side` camera after 25 steps at control `0.1`: the cart has slid
+  along the rail and the pole has swung back about the hinge.
 
 ### Environment (Stage 3)
 
