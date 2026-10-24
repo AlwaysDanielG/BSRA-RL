@@ -17,7 +17,7 @@ To display an image, add `!`: `![Model screenshot](../results/model.png)`.
 - Member: Daniel Gong
 - OS: 15.6
 - Setup diagnostic, viewer, and RGB results; any fix needed: Finished
-- Fork URL and working branch: https://github.com/grmpn/BSRA-RL.git  https://github.com/AlwaysDanielG/BSRA-RL.git
+- Fork URL and working branch: my fork is https://github.com/AlwaysDanielG/BSRA-RL and I worked on branch `onboarding/cartpole`. Upstream is https://github.com/kritav/BSRA-RL, which is the repository my fork was created from and whose `e05f7d7` my work builds on. The onboarding text names `grmpn/BSRA-RL`; `grmpn` is a contributor to the upstream repository (merged as PR #1) rather than its owner.
   Before starting, read the [toolchain overview](../resources/toolchain.md).
   What role does each of MuJoCo, Gymnasium, Stable-Baselines3, and TensorBoard
   play in this exercise? Describe how they work together in your own words: 
