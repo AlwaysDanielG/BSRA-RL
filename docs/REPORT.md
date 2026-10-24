@@ -277,19 +277,9 @@ release are required for these files.
 - Did you learn anything from this onboarding? What was new, or what became
   clearer?
 
-  The part that became clearest was the division of labour between the tools. I
-  had thought of "the RL environment" as one thing, but tracing an action from
-  `step()` through `do_simulation()` to `mj_step()` made the boundary obvious:
-  Gymnasium does bookkeeping and MuJoCo does all the physics. Related to that, I
-  had not expected how much of the task definition lives in the XML rather than in
-  Python. The action range `[-3, 3]` comes from the motor's `ctrlrange` in my own
-  file, and the observation is 4 wide only because I declared two joints.
+  The part that became clearest was the division of labour between the tools. I had thought of "the RL environment" as one thing, but tracing an action from `step()` through `do_simulation()` to `mj_step()` made the boundary obvious: Gymnasium does bookkeeping and MuJoCo does all the physics. Related to that, I had not expected how much of the task definition lives in the XML rather than in Python. The action range `[-3, 3]` comes from the motor's `ctrlrange` in my own file, and the observation is 4 wide only because I declared two joints.
 
-  The reproducibility machinery was also new to me. `run.json` hashing the XML,
-  `env.py`, and the lockfile, and recording the git revision and whether the tree
-  was dirty, means a result can be checked later instead of just believed. The
-  hash check that refuses to evaluate a policy against a changed task is a good
-  example of making the honest path the easy one.
+  The reproducibility machinery was also new to me. `run.json` hashing the XML, `env.py`, and the lockfile, and recording the git revision and whether the tree was dirty, means a result can be checked later instead of just believed. The hash check that refuses to evaluate a policy against a changed task is a good example of making the honest path the easy one.
 
   Two things surprised me. The training curve ends at `791.8` while evaluation
   gives `1000.0`, and working out why (stochastic versus deterministic actions,
