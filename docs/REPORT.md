@@ -100,15 +100,51 @@ setting that supports your answer, and distinguish MuJoCo's role from Gymnasium'
 
 ## Training
 
-- Run name / source commit / training seed: **TODO**
-- Requested and actual steps / elapsed time / device: **TODO**
-- Configuration and versions: **TODO** link `../results/<run>/run.json`
-- Learning curve: **TODO** embed `../results/<run>/learning-curve.png`
+- Run name / source commit / training seed: `first-run` / `2d26581021817f18ee115c030d82140330928bd4` / seed `0`.
+  `source_dirty` is `false`, so the run points at a clean, reproducible revision.
+- Requested and actual steps / elapsed time / device: requested `100,000`, actual
+  `100,352`, `19.8 s`, CPU with `torch_threads=1`. The extra 352 steps are because
+  PPO only stops on a complete rollout, and `100,000` is not a multiple of
+  `n_steps=2048`; 49 rollouts is `100,352`.
+- Configuration and versions: [../results/first-run/run.json](../results/first-run/run.json).
+  Default `PPO_SETTINGS` kept unchanged, so `learning_rate=3e-4`, `n_steps=2048`,
+  `batch_size=64`, `n_epochs=10`, `gamma=0.99`, `gae_lambda=0.95`, `clip_range=0.2`,
+  `stats_window_size=100`. Python 3.12.3, gymnasium 1.2.3, mujoco 3.6.0,
+  stable-baselines3 2.7.1, torch 2.10.0, numpy 2.4.2.
+- Learning curve:
+
+  ![Learning curve](../results/first-run/learning-curve.png)
 
 - What do SB3, PyTorch, and `Monitor` each do here? How does SB3 use the environment
-  and settings you pass to PPO? **TODO**
+  and settings you pass to PPO?
+
+  SB3 is the RL algorithm. It runs the environment to collect rollouts of 2,048
+  steps, computes the PPO loss, and updates the policy for `n_epochs=10` passes in
+  minibatches of 64. PyTorch is underneath that: `MlpPolicy` is a PyTorch network,
+  and PyTorch does the gradients and the optimizer step. I never touch either
+  directly. `Monitor` is a wrapper sitting between SB3 and my env. It does not
+  change the task; it just records the return and length of each finished episode
+  so SB3 has something to log. Without it, `rollout/ep_rew_mean` would be empty.
+
+  SB3 only needs my env to follow the Gymnasium API. It calls `reset()` and
+  `step()` and reads `observation_space` and `action_space` to size the network, so
+  the input layer is 4 wide and the output 1 wide because of my XML.
+
 - What do the curve's axes, averaging, and smoothing mean, and what evidence of
-  improvement, variability, or a plateau do you see? **TODO**
+  improvement, variability, or a plateau do you see?
+
+  The x-axis is environment steps, not episodes, and each point is logged once per
+  rollout, so there are 49 points. Each value is a rolling mean over the last 100
+  training episodes (`stats_window_size=100`), which is already a kind of
+  smoothing. I plotted the raw logged values with no extra smoothing.
+
+  There is clear, steady improvement: `rollout/ep_rew_mean` goes from `7.3` at
+  2,048 steps to `791.8` at 100,352. The climb is close to linear after about
+  20,000 steps and shows no plateau. It is still rising at the end of the budget,
+  which says the run stopped because it hit the step budget, not because learning
+  finished. More steps would probably push it toward the 1,000 ceiling.
+  `ep_len_mean` tracks `ep_rew_mean` almost exactly, which makes sense since reward
+  is 1 per surviving step.
 
 ## Evaluation
 
@@ -117,16 +153,62 @@ Use reset seeds 10000–10019, deterministic PPO actions, and random action seed
 
 | Agent | Episodes | Return mean ± std | Length mean ± std | Time-limit fraction |
 | --- | --- | --- | --- | --- |
-| Random | TODO | TODO | TODO | TODO |
-| PPO | TODO | TODO | TODO | TODO |
+| Random | 20 | 4.80 ± 2.66 | 5.80 ± 2.66 | 0.00 |
+| PPO | 20 | 1000.00 ± 0.00 | 1000.00 ± 0.00 | 1.00 |
 
-- Per-episode CSV and summary JSON: **TODO** links
-- Predetermined PPO rollout (seed 10000): **TODO** briefly describe the behavior you observed
-- Limitation or failure, and a specific diagnosis if learning was weak: **TODO**
+- Per-episode CSV and summary JSON:
+  [episodes.csv](../results/first-run/episodes.csv) and
+  [summary.json](../results/first-run/summary.json).
+  PPO reached the 1,000-step time limit on all 20 seeds, so every PPO row is
+  `truncated=True` and `terminated=False`, and the standard deviation is exactly 0.
+  Random dropped the pole in under 6 steps on average and never once reached the
+  time limit. That is a difference of about 208x in mean return.
+- Predetermined PPO rollout (seed 10000): the pole stays upright for the whole
+  1,000 steps (40 s of simulated time). I replayed that seed and logged the state:
+  the pole angle never exceeds `0.0281 rad`, which is about 14% of the `0.2 rad`
+  failure threshold, and the cart stays between `-0.015 m` and `+0.078 m`, nowhere
+  near the `+/-1.25 m` rail limit. In the video the cart makes small corrections
+  and drifts slowly right. The policy is not just avoiding failure, it is holding
+  the pole close to vertical.
+- Limitation or failure, and a specific diagnosis if learning was weak: learning
+  was not weak, so the limitation is elsewhere. This is **one training seed**
+  (seed 0). The `± 0.00` in the table measures 20 different starting states for
+  that single policy; it says nothing about how often a rerun with a different
+  training seed would do this well. PPO is known to vary a lot across training
+  seeds, so I cannot claim this result is typical from one run. A second limitation
+  is that the evaluation ceiling is the time limit itself: once a policy reaches
+  1,000 every time, the metric is saturated and cannot distinguish a good policy
+  from a better one.
 
 - Why does this evaluation differ from a training curve, and what can one
   trained seed not establish? What carries over to humanoid soccer, and what is
-  missing (for example, contacts, partial observations, or sim-to-real transfer)? **TODO**
+  missing?
+
+  The curve and this evaluation measure different things, which is why the curve
+  ends at `791.8` while evaluation gives a clean `1000.0`. Three reasons: training
+  episodes use **stochastic** actions sampled from the policy, while evaluation
+  uses `deterministic=True`; the curve is a rolling average over the last 100
+  training episodes, so it still carries weaker earlier episodes; and the policy
+  kept improving during the final rollouts. Evaluation is also a fresh process with
+  no learning, on seeds reserved for evaluation.
+
+  One trained seed cannot establish that the method is reliable. It gives no
+  confidence interval over training runs and no evidence about sensitivity to
+  hyperparameters or initialization.
+
+  What carries over: the whole toolchain and workflow. An XML model compiled by
+  MuJoCo, a Gymnasium wrapper defining observation, action, reward and termination,
+  PPO on top, a reserved set of evaluation seeds, and a baseline to compare
+  against. The habit of recording versions, hashes, and the source revision in
+  `run.json` is what makes a result checkable later.
+
+  What is missing is most of the hard part. Collisions are disabled here with
+  `contype="0" conaffinity="0"`, so there are no contacts at all, and contact is
+  the core difficulty in walking or kicking. The observation is the full exact
+  state, 4 clean numbers, rather than noisy or partial sensing. The action space is
+  one actuator instead of many coupled joints. The reward is a trivial `+1` per
+  step rather than a shaped objective. And nothing here touches sim-to-real
+  transfer, where model error and latency start to matter.
 
 ## Review
 
