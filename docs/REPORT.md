@@ -266,7 +266,14 @@ release are required for these files.
     episodes end in about 5-6 steps.
   - `videos/first-run/episode-10000.mp4` is 1,000 frames at 25 fps, 640 x 480,
     and the pole stays upright throughout.
-- Fork PR link and review notes (record merge in the PR): PR_PLACEHOLDER
+- Fork PR link and review notes (record merge in the PR):
+  https://github.com/AlwaysDanielG/BSRA-RL/pull/1 -- base repository
+  `AlwaysDanielG/BSRA-RL`, base branch `main`, compare branch
+  `onboarding-cartpole` (the branch uses a hyphen because my fork already had a
+  branch named `onboarding`, and Git cannot hold both that ref and an
+  `onboarding/` directory). The review is recorded as a comment on the PR and
+  covers the model, environment, training, evaluation, checks, and limitations.
+  Merged into my fork's `main` on 2026-10-24.
 
 ## Feedback
 
