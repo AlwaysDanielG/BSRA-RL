@@ -212,20 +212,109 @@ Use reset seeds 10000–10019, deterministic PPO actions, and random action seed
 
 ## Review
 
-**TODO:** Record exact setup, test, train, and evaluate commands, plus any rendering
-environment variable.
+Run everything from the repository root after `git clone` and `uv sync`.
+
+```bash
+# setup
+uv run python scripts/check_setup.py
+uv run mjpython scripts/check_setup.py --viewer     # mjpython only on macOS
+uv run python scripts/check_setup.py --rgb
+
+# tests
+uv run python -m pytest
+
+# model inspection (macOS: mjpython)
+uv run mjpython scripts/view_model.py
+uv run mjpython scripts/view_model.py --control 0.1 --seconds 1
+uv run mjpython scripts/view_model.py --control -0.1 --seconds 1
+
+# environment check with random actions
+uv run python scripts/evaluate.py --random-only --run-name random-debug --episodes 3 --trace
+
+# training (commit first, so run.json records a clean revision)
+uv run python scripts/train.py --run-name smoke --smoke
+uv run python scripts/train.py --run-name first-run --seed 0 --steps 100000
+uv run tensorboard --logdir runs
+
+# evaluation
+uv run python scripts/evaluate.py --policy models/first-run/policy.zip --run-name first-run --video
+```
+
+No rendering environment variable was needed on Apple Silicon macOS. The only
+platform requirement is launching anything that opens a viewer window with
+`mjpython` instead of `python`, which MuJoCo needs for its passive viewer.
+Training and evaluation use ordinary `python`.
 
 Keep the saved policy, TensorBoard logs, and rollout video locally and share them
 directly with the RL lead if requested. No file uploads, download links, or GitHub
 release are required for these files.
 
-- Automated test results: **TODO**
-- Manual model/render/video checks: **TODO**
-- Fork PR link and review notes (record merge in the PR): **TODO**
+- Automated test results: `uv run python -m pytest` passes **17 tests** (2 model,
+  11 environment, 4 pipeline). The single warning is SB3's expected
+  action-range notice, recorded in the Environment section above.
+- Manual model/render/video checks:
+  - Setup diagnostic, `--viewer`, and `--rgb` all passed during Stage 1.
+  - Viewer trials ran at control `0`, `+0.1`, and `-0.1`. The cart moves in
+    opposite directions for opposite controls and the pole swings about the hinge.
+    Note: each trial crashes *after* the run finishes with
+    `AssertionError: cannot join a dummy thread` from `thread.join()` in the
+    supplied [onboarding/viewer.py](../onboarding/viewer.py). It happens in the
+    teardown of the provided helper, not in my model, and the simulation loop
+    completes first. Offscreen rendering is unaffected.
+  - `results/model.png` was rendered offscreen through the `side` camera.
+  - `videos/random-debug/episode-10000.mp4` shows the custom scene; random
+    episodes end in about 5-6 steps.
+  - `videos/first-run/episode-10000.mp4` is 1,000 frames at 25 fps, 640 x 480,
+    and the pole stays upright throughout.
+- Fork PR link and review notes (record merge in the PR): **TODO after pushing** --
+  push `onboarding/cartpole` to `origin`
+  (https://github.com/AlwaysDanielG/BSRA-RL), open the PR with base repository
+  `AlwaysDanielG/BSRA-RL`, base branch `main`, compare branch
+  `onboarding/cartpole`, then paste the PR link and merge note here.
 
 ## Feedback
 
 - Did you learn anything from this onboarding? What was new, or what became
-  clearer? If little was new, say so: **TODO**
+  clearer?
+
+  The part that became clearest was the division of labour between the tools. I
+  had thought of "the RL environment" as one thing, but tracing an action from
+  `step()` through `do_simulation()` to `mj_step()` made the boundary obvious:
+  Gymnasium does bookkeeping and MuJoCo does all the physics. Related to that, I
+  had not expected how much of the task definition lives in the XML rather than in
+  Python. The action range `[-3, 3]` comes from the motor's `ctrlrange` in my own
+  file, and the observation is 4 wide only because I declared two joints.
+
+  The reproducibility machinery was also new to me. `run.json` hashing the XML,
+  `env.py`, and the lockfile, and recording the git revision and whether the tree
+  was dirty, means a result can be checked later instead of just believed. The
+  hash check that refuses to evaluate a policy against a changed task is a good
+  example of making the honest path the easy one.
+
+  Two things surprised me. The training curve ends at `791.8` while evaluation
+  gives `1000.0`, and working out why (stochastic versus deterministic actions,
+  plus a 100-episode rolling average) taught me more than the numbers themselves.
+  And the result is nearly saturated: once the policy hits the time limit on every
+  seed, the metric cannot distinguish good from better.
+
 - What improvements would make the onboarding easier to follow or more useful?
-  Mention any confusing instructions, missing background, or unnecessary work: **TODO**
+
+  The supplied viewer crashes on teardown on Apple Silicon macOS
+  (`AssertionError: cannot join a dummy thread`, [onboarding/viewer.py](../onboarding/viewer.py)).
+  It is harmless, since it fires after the trial, but it looks like a failure at
+  exactly the moment you are checking whether your model is correct. Either fix
+  the `thread.join()` or warn about it in the Stage 2 text.
+
+  Stage 2 asks for a screenshot at `results/model.png` but does not say how to
+  capture one. The viewer window has no save button, so the practical route is
+  offscreen rendering with `mujoco.Renderer`. One example line would save time.
+
+  Stage 4 says to commit before the full run so `run.json` records a clean
+  revision. Worth adding that `git status --porcelain` counts untracked files too,
+  so leftover smoke-run output under `results/smoke/` keeps `source_dirty` true
+  even after the code is committed.
+
+  Finally, the exercise never produces a weak result to diagnose. The default
+  settings work on the first try, so the instruction about supporting one
+  diagnosis with checks and logs gets no exercise. A deliberately broken variant
+  to debug would make that skill real rather than hypothetical.
